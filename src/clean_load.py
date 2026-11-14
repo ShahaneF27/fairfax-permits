@@ -1,6 +1,9 @@
 import pandas as pd
+import sqlite3
 
 RAW_PATH = "data/raw/building_records_plus.csv"
+DB_PATH = "data/permits.db"
+SCHEMA_PATH = "sql/schema.sql"
 
 #1.load
 df = pd.read_csv(RAW_PATH, low_memory=False)
@@ -84,3 +87,61 @@ print("\n--- Median days to decision, by record type ---")
 print(df.groupby("record_type")["days_to_decision"].median().to_string())
 print("\nShare still open:", round(df["is_open"].mean() * 100, 1), "%")
 print("Share in a growth center:", round(df["in_growth_center"].mean() * 100, 1), "%")
+
+#10. build lookup tables
+record_types = (
+    df[["record_type", "category", "sector"]]
+    .drop_duplicates()
+    .sort_values("record_type")
+    .reset_index(drop=True)
+)
+record_types["record_type_id"] = record_types.index + 1
+
+districts = pd.DataFrame({"district_name": sorted(df["supervisor_district"].unique())})
+districts["district_id"] = districts.index + 1
+
+growth_centers = pd.DataFrame({"growth_center_name": sorted(df["development_center"].dropna().unique())})
+growth_centers["growth_center_id"] = growth_centers.index + 1
+
+#11. swap names for IDs in the permits table
+permits = (
+    df.merge(record_types[["record_type", "record_type_id"]], on="record_type", how="left")
+      .merge(districts, left_on="supervisor_district", right_on="district_name", how="left")
+      .merge(growth_centers, left_on="development_center", right_on="growth_center_name", how="left")
+)
+permits["growth_center_id"] = permits["growth_center_id"].astype("Int64")
+permits["days_to_decision"] = permits["days_to_decision"].astype("Int64")
+
+for col in DATE_COLS:
+    permits[col] = permits[col].dt.strftime("%Y-%m-%d")
+
+permits = permits.rename(columns={"parcel_id_number": "parcel_id"})
+PERMIT_COLS = [
+    "record_id", "record_type_id", "district_id", "growth_center_id",
+    "project_name", "parcel_id", "address", "city", "zip5", "record_status",
+    "status_date", "submitted_date", "accepted_date", "issued_date",
+    "approved_date", "closed_date", "days_to_decision", "is_open",
+]
+permits = permits[PERMIT_COLS]
+
+#12. write to SQLite
+with sqlite3.connect(DB_PATH) as conn:
+    conn.execute("PRAGMA foreign_keys = ON")
+    with open(SCHEMA_PATH) as f:
+        conn.executescript(f.read())
+
+    record_types[["record_type_id", "record_type", "category", "sector"]].to_sql(
+        "record_types", conn, if_exists="append", index=False)
+    districts[["district_id", "district_name"]].to_sql(
+        "districts", conn, if_exists="append", index=False)
+    growth_centers[["growth_center_id", "growth_center_name"]].to_sql(
+        "growth_centers", conn, if_exists="append", index=False)
+    permits.to_sql("permits", conn, if_exists="append", index=False)
+
+    # Verify the load
+    print("\n--- Database check ---")
+    for table in ["record_types", "districts", "growth_centers", "permits"]:
+        count = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+        print(f"{table}: {count} rows")
+    problems = conn.execute("PRAGMA foreign_key_check").fetchall()
+    print("Foreign key problems:", len(problems))
