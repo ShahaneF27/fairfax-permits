@@ -6,11 +6,11 @@ A Python, SQL, and Power BI project analyzing **141,000+ Fairfax County building
 
 ## Questions
 
-1. Which parts of the county see the most permit activity, and how does commercial activity compare with residential?
-2. How has permit volume changed from year to year?
-3. How long does it take to get a permit decision, and does it vary by permit type?
-4. Did processing times change after the county's October 2022 move to its new permitting system (PLUS)?
-5. How much commercial activity happens inside the county's planned growth centers?
+1. Which parts of the county see the most permit activity, and how does commercial activity compare with residential? *(queries 01, 07)*
+2. How has permit volume changed from year to year? *(queries 02, 06)*
+3. How long does it take to get a permit decision, and does it vary by permit type? *(query 03)*
+4. Did processing times change after the county's October 2022 move to its new permitting system (PLUS)? *(query 04)*
+5. How much commercial activity happens inside the county's planned growth centers? *(query 05)*
 
 ## Data
 
