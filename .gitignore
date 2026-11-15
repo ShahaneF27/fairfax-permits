@@ -222,3 +222,5 @@ __marimo__/
 #Project data (rebuilt by running the scripts)
 data/raw/
 *.db
+
+dashboard/data/
